@@ -143,4 +143,5 @@ To run the full stack, you need both servers running simultaneously.
 - *Query:* "What are the company's rules on remote work?"
 - *Output:* "I cannot answer this question because the information is not present in the provided SOPs." *(Zero Hallucination Tolerance)*
 
-<img width="942" height="473" alt="Screenshot 2026-04-27 171124" src="https://github.com/user-attachments/assets/137ec45a-212f-4c04-9869-a1b4a4326e3e" />
+<img width="1837" height="875" alt="image" src="https://github.com/user-attachments/assets/5a78bf9b-be1d-4829-a693-cbb959763a68" />
+
