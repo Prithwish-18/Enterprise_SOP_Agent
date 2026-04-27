@@ -40,7 +40,7 @@ const ChatWindow = ({ onUploadSuccess }) => {
                 // Optionally show an error toast here
             } finally {
                 setIsUploading(false);
-                // Reset input
+                // Reset input of the pdf
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
         }
