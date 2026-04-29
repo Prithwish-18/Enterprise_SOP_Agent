@@ -3,7 +3,10 @@ import { ChatContext } from '../context/ChatContext';
 import { streamQueryResponse } from '../services/stream';
 
 export const useChat = () => {
-    const { messages, addMessage, updateLastMessage, isTyping, setIsTyping, apiKey } = useContext(ChatContext);
+    const { 
+        messages, addMessage, updateLastMessage, isTyping, setIsTyping, apiKey,
+        sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession
+    } = useContext(ChatContext);
 
     const sendMessage = async (query) => {
         if (!query.trim()) return;
@@ -31,5 +34,8 @@ export const useChat = () => {
         );
     };
 
-    return { messages, isTyping, sendMessage };
+    return { 
+        messages, isTyping, sendMessage,
+        sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession
+    };
 };

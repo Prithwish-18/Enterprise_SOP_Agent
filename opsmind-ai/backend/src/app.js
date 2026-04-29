@@ -5,6 +5,8 @@ const morgan = require('morgan');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const adminRoutes = require('./routes/adminRoutes');
 const queryRoutes = require('./routes/queryRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -18,6 +20,12 @@ app.use(morgan('dev'));
 // Routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/query', queryRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/auth', authRoutes);
+
+// Serve uploaded files statically
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check
 app.get('/health', (req, res) => {

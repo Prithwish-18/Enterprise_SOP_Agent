@@ -8,9 +8,22 @@ export default defineConfig({
     react(),
     tailwindcss()
   ],
+  base: '/',
+  // server: {
+  //   proxy: {
+  //     '/api': 'http://localhost:5000'
+  //   }
+  // }
   server: {
     proxy: {
-      '/api': 'http://localhost:5000'
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      },
+      '/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      }
     }
   }
 })
