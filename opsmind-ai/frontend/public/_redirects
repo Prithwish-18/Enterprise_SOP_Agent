@@ -1,0 +1,6 @@
+# SPA Routing: Redirect all requests to index.html
+/*    /index.html   200
+
+# Optional Proxy: Proxy API calls to your backend to avoid CORS issues
+# /api/*  https://your-backend.vercel.app/api/:splat  200
+

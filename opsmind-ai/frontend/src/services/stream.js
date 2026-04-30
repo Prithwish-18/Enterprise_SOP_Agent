@@ -1,9 +1,11 @@
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export const streamQueryResponse = async (query, apiKey, onUpdate, onComplete, onError) => {
     try {
         // Don't send placeholder keys to the server
         const effectiveKey = (apiKey && apiKey !== '__USE_SERVER_KEY__') ? apiKey : '';
 
-        const response = await fetch('/api/query/stream', {
+        const response = await fetch(`${BASE_URL}/api/query/stream`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',

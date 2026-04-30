@@ -1,3 +1,5 @@
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export const uploadSOP = async (files, email) => {
     const formData = new FormData();
     
@@ -14,7 +16,7 @@ export const uploadSOP = async (files, email) => {
     const apiKey = localStorage.getItem('opsmind_gemini_key') || '';
     const effectiveKey = (apiKey && apiKey !== '__USE_SERVER_KEY__') ? apiKey : '';
 
-    const response = await fetch('/api/admin/upload', {
+    const response = await fetch(`${BASE_URL}/api/admin/upload`, {
         method: 'POST',
         headers: { 'x-gemini-api-key': effectiveKey },
         body: formData,
@@ -30,14 +32,14 @@ export const uploadSOP = async (files, email) => {
 
 export const getDocuments = async (email) => {
     const query = email ? `?email=${encodeURIComponent(email)}` : '';
-    const response = await fetch(`/api/admin/documents${query}`);
+    const response = await fetch(`${BASE_URL}/api/admin/documents${query}`);
     if (!response.ok) throw new Error('Failed to fetch documents');
     return response.json();
 };
 
 export const deleteDocument = async (docId, email) => {
     const query = email ? `?email=${encodeURIComponent(email)}` : '';
-    const response = await fetch(`/api/admin/documents/${docId}${query}`, { method: 'DELETE' });
+    const response = await fetch(`${BASE_URL}/api/admin/documents/${docId}${query}`, { method: 'DELETE' });
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to delete document');
@@ -47,14 +49,14 @@ export const deleteDocument = async (docId, email) => {
 
 export const getSessions = async (email) => {
     if (!email) return [];
-    const response = await fetch(`/api/chat/sessions?email=${encodeURIComponent(email)}`);
+    const response = await fetch(`${BASE_URL}/api/chat/sessions?email=${encodeURIComponent(email)}`);
     if (!response.ok) throw new Error('Failed to fetch sessions');
     return response.json();
 };
 
 export const createSession = async (email, title = 'New Chat') => {
     if (!email) throw new Error('Email required to create session');
-    const response = await fetch('/api/chat/sessions', {
+    const response = await fetch(`${BASE_URL}/api/chat/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, title })
@@ -64,7 +66,7 @@ export const createSession = async (email, title = 'New Chat') => {
 };
 
 export const updateSession = async (id, data) => {
-    const response = await fetch(`/api/chat/sessions/${id}`, {
+    const response = await fetch(`${BASE_URL}/api/chat/sessions/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -74,20 +76,20 @@ export const updateSession = async (id, data) => {
 };
 
 export const deleteSessionApi = async (id) => {
-    const response = await fetch(`/api/chat/sessions/${id}`, { method: 'DELETE' });
+    const response = await fetch(`${BASE_URL}/api/chat/sessions/${id}`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Failed to delete session');
     return response.json();
 };
 
 export const clearAllSessionsApi = async (email) => {
     if (!email) throw new Error('Email required');
-    const response = await fetch(`/api/chat/sessions?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+    const response = await fetch(`${BASE_URL}/api/chat/sessions?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Failed to clear sessions');
     return response.json();
 };
 
 export const signupUser = async (name, email, password) => {
-    const response = await fetch('/api/auth/signup', {
+    const response = await fetch(`${BASE_URL}/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
@@ -98,7 +100,7 @@ export const signupUser = async (name, email, password) => {
 };
 
 export const loginUser = async (email, password) => {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -109,7 +111,7 @@ export const loginUser = async (email, password) => {
 };
 
 export const updateProfileUser = async (email, name, oldPassword, newPassword, apiKey) => {
-    const response = await fetch('/api/auth/profile', {
+    const response = await fetch(`${BASE_URL}/api/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name, oldPassword, newPassword, apiKey })

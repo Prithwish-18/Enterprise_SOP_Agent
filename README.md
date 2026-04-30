@@ -1,10 +1,8 @@
 <div align="center">
-  <h1>
-  <img src="opsmind-ai/frontend/public/logo.png" width="30" />
-    Opsmind Ai - Enterprise SOP Knowledge Brain
-  <h1>
+   <img src="opsmind-ai/frontend/public/logo.png" width="100" />
+   <h1>Opsmind Ai - Enterprise SOP Knowledge Brain<h1>
     <strong>A production-ready, context-aware corporate knowledge brain using Retrieval-Augmented Generation (RAG). OpsMind Ai transforms static standard operating procedures (SOPs) into an interactive, highly accurate AI assistant that strictly relies on approved documentation</strong>
-  </p>
+   </p>
   <p>
     <a href="https://ai-opsmind.vercel.app">
       <img src="https://img.shields.io/badge/🚀 Live_Demo_vercel-View_Live-green?style=for-the-badge" />
