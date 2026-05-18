@@ -16,10 +16,13 @@ app.use(helmet());
 
 // Restrict CORS to the deployed frontend only
 const allowedOrigins = [
-    process.env.FRONTEND_URL,        
-    'http://localhost:5173',         
-    'http://localhost:4173',     
-].filter(Boolean);
+    process.env.FRONTEND_URL,
+    ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : []),
+    'https://ai-opsmind.vercel.app',
+    'https://ai-opsmind.netlify.app',
+    'http://localhost:5173',
+    'http://localhost:4173',
+].filter(Boolean).map(url => url.trim().replace(/\/$/, ''));
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -48,7 +51,7 @@ const authLimiter = rateLimit({
 
 // Rate limiting — AI query / upload cost protection
 const apiLimiter = rateLimit({
-    windowMs: 60 * 1000, 
+    windowMs: 60 * 1000,
     max: 60,
     message: { error: 'Too many requests. Please slow down.' },
     standardHeaders: true,
