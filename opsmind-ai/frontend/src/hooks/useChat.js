@@ -4,8 +4,9 @@ import { streamQueryResponse } from '../services/stream';
 
 export const useChat = () => {
     const { 
-        messages, addMessage, updateLastMessage, isTyping, setIsTyping, apiKey,
-        sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession
+        messages, addMessage, updateLastMessage, isTyping, setIsTyping, apiKey, authToken,
+        sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession,
+        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages
     } = useContext(ChatContext);
 
     const sendMessage = async (query) => {
@@ -14,12 +15,12 @@ export const useChat = () => {
         addMessage({ id: Date.now(), text: query, sender: 'user' });
         setIsTyping(true);
         
-        // Add empty AI message placeholder
         addMessage({ id: Date.now() + 1, text: '', sender: 'ai', sources: null });
 
         await streamQueryResponse(
             query,
             apiKey,
+            authToken,
             (currentText, currentSources) => {
                 updateLastMessage(currentText, currentSources);
             },
@@ -30,12 +31,16 @@ export const useChat = () => {
             (err) => {
                 updateLastMessage(`Error: ${err}`, null);
                 setIsTyping(false);
-            }
+            },
+            isPrivateMode,
+            isDeepResearch,
+            activeSessionId
         );
     };
 
     return { 
         messages, isTyping, sendMessage,
-        sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession
+        sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession,
+        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages
     };
 };

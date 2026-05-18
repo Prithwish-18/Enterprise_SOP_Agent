@@ -1,27 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const ChatSession = require('../models/ChatSession');
+const { protect } = require('../middleware/authMiddleware');
+const { cleanupOldData } = require('../utils/cleanup');
 
-// Get all sessions for a user
-router.get('/sessions', async (req, res, next) => {
+// All session routes are protected — identity comes from JWT
+router.get('/sessions', protect, async (req, res, next) => {
     try {
-        const email = req.query.email;
-        if (!email) return res.status(400).json({ error: 'Email required' });
+        // Automatically wipe data older than 30 days dynamically
+        await cleanupOldData(req.user.email);
         
-        const sessions = await ChatSession.find({ userId: email }).sort({ updatedAt: -1 });
+        const sessions = await ChatSession.find({ userId: req.user.email }).sort({ updatedAt: -1 });
         res.json(sessions);
     } catch (error) {
         next(error);
     }
 });
 
-// Create new session
-router.post('/sessions', async (req, res, next) => {
+router.post('/sessions', protect, async (req, res, next) => {
     try {
-        const { email, title } = req.body;
-        if (!email) return res.status(400).json({ error: 'Email required' });
-
-        const session = new ChatSession({ userId: email, title: title || 'New Chat', messages: [] });
+        const { title } = req.body;
+        const session = new ChatSession({ 
+            userId: req.user.email, 
+            title: title || 'New Chat', 
+            messages: [] 
+        });
         await session.save();
         res.status(201).json(session);
     } catch (error) {
@@ -29,45 +32,43 @@ router.post('/sessions', async (req, res, next) => {
     }
 });
 
-// Update session (add message or rename)
-router.put('/sessions/:id', async (req, res, next) => {
+// Ownership check: session must belong to the requesting user
+router.put('/sessions/:id', protect, async (req, res, next) => {
     try {
         const { messages, title } = req.body;
         const updateData = {};
         if (messages) updateData.messages = messages;
         if (title) updateData.title = title;
 
-        const session = await ChatSession.findByIdAndUpdate(
-            req.params.id, 
+        const session = await ChatSession.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user.email },
             updateData,
             { new: true }
         );
         
-        if (!session) return res.status(404).json({ error: 'Session not found' });
+        if (!session) return res.status(404).json({ error: 'Session not found or access denied' });
         res.json(session);
     } catch (error) {
         next(error);
     }
 });
 
-// Delete a session
-router.delete('/sessions/:id', async (req, res, next) => {
+router.delete('/sessions/:id', protect, async (req, res, next) => {
     try {
-        const session = await ChatSession.findByIdAndDelete(req.params.id);
-        if (!session) return res.status(404).json({ error: 'Session not found' });
+        const session = await ChatSession.findOneAndDelete({ 
+            _id: req.params.id, 
+            userId: req.user.email 
+        });
+        if (!session) return res.status(404).json({ error: 'Session not found or access denied' });
         res.json({ message: 'Session deleted' });
     } catch (error) {
         next(error);
     }
 });
 
-// Clear all sessions for a user
-router.delete('/sessions', async (req, res, next) => {
+router.delete('/sessions', protect, async (req, res, next) => {
     try {
-        const email = req.query.email;
-        if (!email) return res.status(400).json({ error: 'Email required' });
-        
-        await ChatSession.deleteMany({ userId: email });
+        await ChatSession.deleteMany({ userId: req.user.email });
         res.json({ message: 'All sessions deleted' });
     } catch (error) {
         next(error);

@@ -14,3 +14,5 @@ connectDB().then(() => {
     logger.error('Failed to connect to database', err);
     process.exit(1);
 });
+
+// trigger restart

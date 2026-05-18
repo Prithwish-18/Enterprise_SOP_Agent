@@ -1,90 +1,104 @@
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
-export const uploadSOP = async (files, email) => {
+const getAuthHeaders = (token) => ({
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+});
+
+const handleResponseErrors = async (response, defaultError) => {
+    if (response.status === 401) {
+        window.dispatchEvent(new Event('auth_error'));
+    }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || defaultError);
+    }
+};
+
+export const uploadSOP = async (files, token, sessionId) => {
     const formData = new FormData();
-    
-    // Support single file or array of files
+    if (sessionId) {
+        formData.append('sessionId', sessionId);
+    }
     const fileList = Array.isArray(files) ? files : [files];
     fileList.forEach(file => {
         formData.append('document', file);
     });
-    
-    if (email) {
-        formData.append('email', email);
-    }
-    
     const apiKey = localStorage.getItem('opsmind_gemini_key') || '';
     const effectiveKey = (apiKey && apiKey !== '__USE_SERVER_KEY__') ? apiKey : '';
-
     const response = await fetch(`${BASE_URL}/api/admin/upload`, {
         method: 'POST',
-        headers: { 'x-gemini-api-key': effectiveKey },
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'x-gemini-api-key': effectiveKey 
+        },
         body: formData,
     });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Upload failed');
-    }
-    
+    await handleResponseErrors(response, 'Upload failed');
     return response.json();
 };
 
-export const getDocuments = async (email) => {
-    const query = email ? `?email=${encodeURIComponent(email)}` : '';
-    const response = await fetch(`${BASE_URL}/api/admin/documents${query}`);
-    if (!response.ok) throw new Error('Failed to fetch documents');
+export const getDocuments = async (token, sessionId) => {
+    const url = sessionId ? `${BASE_URL}/api/admin/documents?sessionId=${sessionId}` : `${BASE_URL}/api/admin/documents`;
+    const response = await fetch(url, {
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to fetch documents');
     return response.json();
 };
 
-export const deleteDocument = async (docId, email) => {
-    const query = email ? `?email=${encodeURIComponent(email)}` : '';
-    const response = await fetch(`${BASE_URL}/api/admin/documents/${docId}${query}`, { method: 'DELETE' });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to delete document');
-    }
+export const deleteDocument = async (docId, token) => {
+    const response = await fetch(`${BASE_URL}/api/admin/documents/${docId}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to delete document');
     return response.json();
 };
 
-export const getSessions = async (email) => {
-    if (!email) return [];
-    const response = await fetch(`${BASE_URL}/api/chat/sessions?email=${encodeURIComponent(email)}`);
-    if (!response.ok) throw new Error('Failed to fetch sessions');
+export const getSessions = async (token) => {
+    const response = await fetch(`${BASE_URL}/api/chat/sessions`, {
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to fetch sessions');
     return response.json();
 };
 
-export const createSession = async (email, title = 'New Chat') => {
-    if (!email) throw new Error('Email required to create session');
+export const createSession = async (title = 'New Chat', token) => {
     const response = await fetch(`${BASE_URL}/api/chat/sessions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, title })
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({ title })
     });
-    if (!response.ok) throw new Error('Failed to create session');
+    await handleResponseErrors(response, 'Failed to create session');
     return response.json();
 };
 
-export const updateSession = async (id, data) => {
+export const updateSession = async (id, data, token) => {
     const response = await fetch(`${BASE_URL}/api/chat/sessions/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(token),
         body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Failed to update session');
+    await handleResponseErrors(response, 'Failed to update session');
     return response.json();
 };
 
-export const deleteSessionApi = async (id) => {
-    const response = await fetch(`${BASE_URL}/api/chat/sessions/${id}`, { method: 'DELETE' });
-    if (!response.ok) throw new Error('Failed to delete session');
+export const deleteSessionApi = async (id, token) => {
+    const response = await fetch(`${BASE_URL}/api/chat/sessions/${id}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to delete session');
     return response.json();
 };
 
-export const clearAllSessionsApi = async (email) => {
-    if (!email) throw new Error('Email required');
-    const response = await fetch(`${BASE_URL}/api/chat/sessions?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
-    if (!response.ok) throw new Error('Failed to clear sessions');
+export const clearAllSessionsApi = async (token) => {
+    const response = await fetch(`${BASE_URL}/api/chat/sessions`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to clear sessions');
     return response.json();
 };
 
@@ -94,9 +108,11 @@ export const signupUser = async (name, email, password) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Signup failed');
-    return data;
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Signup failed');
+    }
+    return response.json();
 };
 
 export const loginUser = async (email, password) => {
@@ -105,18 +121,67 @@ export const loginUser = async (email, password) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Login failed');
-    return data;
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Login failed');
+    }
+    return response.json();
 };
 
-export const updateProfileUser = async (email, name, oldPassword, newPassword, apiKey) => {
+export const updateProfileUser = async (name, oldPassword, newPassword, apiKey, token) => {
     const response = await fetch(`${BASE_URL}/api/auth/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, oldPassword, newPassword, apiKey })
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({ name, oldPassword, newPassword, apiKey })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Profile update failed');
-    return data;
+    await handleResponseErrors(response, 'Profile update failed');
+    return response.json();
 };
+
+export const deleteAllDocumentsApi = async (token) => {
+    const response = await fetch(`${BASE_URL}/api/admin/documents`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token)
+    });
+    await handleResponseErrors(response, 'Delete all documents failed');
+    return response.json();
+};
+
+export const deletePrivateDocumentsApi = async (token) => {
+    const response = await fetch(`${BASE_URL}/api/admin/documents/private`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token)
+    });
+    await handleResponseErrors(response, 'Delete private documents failed');
+    return response.json();
+};
+
+export const sendHeartbeat = async (token, deviceInfo) => {
+    try {
+        await fetch(`${BASE_URL}/api/auth/sessions/heartbeat`, {
+            method: 'POST',
+            headers: getAuthHeaders(token),
+            body: JSON.stringify(deviceInfo),
+        });
+    } catch (_) { /* silent — non-critical */ }
+};
+
+/** Fetch all active device sessions for the logged-in user */
+export const getActiveSessions = async (token) => {
+    const response = await fetch(`${BASE_URL}/api/auth/sessions`, {
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to fetch sessions');
+    return response.json();
+};
+
+/** Revoke (sign out) a specific session by its id */
+export const revokeSession = async (sessionId, token) => {
+    const response = await fetch(`${BASE_URL}/api/auth/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+    });
+    await handleResponseErrors(response, 'Failed to revoke session');
+    return response.json();
+};
+

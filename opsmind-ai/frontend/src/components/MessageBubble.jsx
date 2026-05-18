@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Bot, AlertTriangle } from 'lucide-react';
 import SourceViewer from './SourceViewer';
+import user from '../assets/user.png';
 
 const MessageBubble = ({ message }) => {
     const isUser = message.sender === 'user';
@@ -9,15 +10,11 @@ const MessageBubble = ({ message }) => {
     // Simple markdown-like formatting
     const formatText = (text) => {
         if (!text) return null;
-        
         return text.split('\n').map((line, i) => {
-            // Bold text **text**
             let formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            // Bullet points
             if (formatted.trim().startsWith('- ') || formatted.trim().startsWith('• ')) {
                 formatted = '  • ' + formatted.trim().substring(2);
             }
-            // Numbered lists
             const numMatch = formatted.trim().match(/^(\d+)\.\s/);
             if (numMatch) {
                 formatted = `  ${numMatch[1]}. ` + formatted.trim().substring(numMatch[0].length);
@@ -33,32 +30,26 @@ const MessageBubble = ({ message }) => {
     };
 
     return (
-        <div className={`flex gap-3 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex gap-1.5 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`}>
             {/* Avatar */}
             <div 
-                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1"
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-1"
                 style={{ 
-                    background: isUser 
-                        ? 'linear-gradient(135deg, #3b82f6, #2563eb)' 
-                        : isError 
-                            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                            : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                    boxShadow: isUser 
-                        ? '0 2px 10px rgba(59,130,246,0.3)' 
-                        : '0 2px 10px rgba(99,102,241,0.3)'
+                    background: "none",
+                    boxShadow:"none"
                 }}>
-                {isUser ? <User size={15} className="text-white" /> : 
-                 isError ? <AlertTriangle size={15} className="text-white" /> :
-                 <Bot size={15} className="text-white" />}
+                {isUser ? <img src={user} className="w-12 h-12 object-cover"/> : 
+                 isError ? <AlertTriangle size={25} className="text-red-500" /> :
+                 <img src="/logo.png" className="w-9 h-9 object-cover"/>}
             </div>
 
             {/* Content */}
-            <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`} style={{ maxWidth: isUser ? '75%' : '85%' }}>
+            <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`} style={{ maxWidth: isUser ? '70%' : '70%' }}>
                 <div className="text-xs font-medium mb-1" style={{ color: '#64748b' }}>
-                    {isUser ? 'You' : 'OpsMind Agent'}
+                    {isUser ? 'You' : 'OpsMind Ai'}
                 </div>
                 <div 
-                    className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                    className="rounded-2xl px-3 py-2 text-sm leading-relaxed"
                     style={{
                         background: isUser 
                             ? 'rgba(59,130,246,0.1)' 
@@ -78,7 +69,7 @@ const MessageBubble = ({ message }) => {
                         borderTopLeftRadius: isUser ? '16px' : '6px',
                     }}>
                     {message.text ? formatText(message.text) : (
-                        <span style={{ color: '#64748b', fontStyle: 'italic' }}>Generating response...</span>
+                        <span style={{ color: '#64748b', fontStyle: 'italic' }}>Generating response . . .</span>
                     )}
                 </div>
                 {!isUser && !isError && <SourceViewer sources={message.sources} />}

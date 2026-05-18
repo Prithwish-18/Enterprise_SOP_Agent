@@ -4,7 +4,6 @@ import { BookOpen, FileText } from 'lucide-react';
 const SourceViewer = ({ sources }) => {
     if (!sources || sources.length === 0) return null;
 
-    // Deduplicate sources by document name + page
     const unique = [];
     const seen = new Set();
     sources.forEach(s => {

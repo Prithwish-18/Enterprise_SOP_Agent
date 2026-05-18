@@ -4,9 +4,6 @@ const { generateQueryEmbedding } = require('./embeddingService');
 const { SEARCH_LIMIT } = require('../config/vector');
 const logger = require('../utils/logger');
 
-/**
- * Cosine similarity between two vectors
- */
 const cosineSimilarity = (vecA, vecB) => {
     if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
     let dot = 0, normA = 0, normB = 0;
@@ -21,13 +18,11 @@ const cosineSimilarity = (vecA, vecB) => {
     return dot / (normA * normB);
 };
 
-/**
- * Keyword-based search fallback (TF-IDF style) — works WITHOUT embeddings
- */
-const keywordSearch = async (queryText, userId) => {
+const keywordSearch = async (queryText, userId, limit = SEARCH_LIMIT, sessionId = null) => {
     logger.info('Using keyword-based fallback search (no embeddings needed)');
     
     const query = userId ? { userId } : {};
+    if (sessionId) query.sessionId = sessionId;
     const allChunks = await Chunk.find(query).lean();
     if (!allChunks || allChunks.length === 0) return [];
 
@@ -35,7 +30,7 @@ const keywordSearch = async (queryText, userId) => {
     const queryWords = queryText.toLowerCase()
         .replace(/[^\w\s]/g, '')
         .split(/\s+/)
-        .filter(w => w.length > 2); // Skip tiny words
+        .filter(w => w.length > 2); 
 
     // Score each chunk by keyword match density
     const scored = allChunks.map(chunk => {
@@ -57,7 +52,7 @@ const keywordSearch = async (queryText, userId) => {
     })
     .filter(c => c.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, SEARCH_LIMIT);
+    .slice(0, limit);
 
     // Lookup document names
     const docIds = [...new Set(scored.map(c => c.documentId.toString()))];
@@ -77,10 +72,11 @@ const keywordSearch = async (queryText, userId) => {
 /**
  * Vector similarity search with keyword fallback
  */
-const fallbackVectorSearch = async (queryEmbedding, userId) => {
+const fallbackVectorSearch = async (queryEmbedding, userId, limit = SEARCH_LIMIT, sessionId = null) => {
     logger.info('Using in-memory cosine similarity search');
     
     const query = userId ? { userId } : {};
+    if (sessionId) query.sessionId = sessionId;
     const allChunks = await Chunk.find(query).lean();
     if (!allChunks || allChunks.length === 0) return [];
 
@@ -91,7 +87,7 @@ const fallbackVectorSearch = async (queryEmbedding, userId) => {
             score: cosineSimilarity(queryEmbedding, chunk.embedding)
         }))
         .sort((a, b) => b.score - a.score)
-        .slice(0, SEARCH_LIMIT);
+        .slice(0, limit);
 
     const docIds = [...new Set(scored.map(c => c.documentId.toString()))];
     const docs = await Document.find({ _id: { $in: docIds } }).lean();
@@ -107,15 +103,25 @@ const fallbackVectorSearch = async (queryEmbedding, userId) => {
     }));
 };
 
-const searchRelevantChunks = async (queryText, apiKey, userId) => {
+const searchRelevantChunks = async (queryText, apiKey, userId, isDeepResearch = false, sessionId = null) => {
     try {
+        const limit = isDeepResearch ? SEARCH_LIMIT * 3 : SEARCH_LIMIT;
+        const numCandidates = isDeepResearch ? 300 : 100;
+
         // Try to generate query embedding
         const queryEmbedding = await generateQueryEmbedding(queryText, apiKey);
         
         if (!queryEmbedding) {
             // Embeddings unavailable — use keyword search
             logger.warn('Embedding generation failed. Falling back to keyword search.');
-            return await keywordSearch(queryText, userId);
+            return await keywordSearch(queryText, userId, limit, sessionId);
+        }
+
+        let vectorFilter = undefined;
+        if (userId || sessionId) {
+            vectorFilter = {};
+            if (userId) vectorFilter.userId = userId;
+            if (sessionId) vectorFilter.sessionId = sessionId;
         }
 
         // Try Atlas Vector Search first
@@ -126,9 +132,9 @@ const searchRelevantChunks = async (queryText, apiKey, userId) => {
                         "index": "vector_index",
                         "path": "embedding",
                         "queryVector": queryEmbedding,
-                        "numCandidates": 100,
-                        "limit": SEARCH_LIMIT,
-                        "filter": userId ? { "userId": userId } : undefined
+                        "numCandidates": numCandidates,
+                        "limit": limit,
+                        "filter": vectorFilter
                     }
                 },
                 {
@@ -158,13 +164,13 @@ const searchRelevantChunks = async (queryText, apiKey, userId) => {
         }
 
         // In-memory vector search
-        return await fallbackVectorSearch(queryEmbedding, userId);
+        return await fallbackVectorSearch(queryEmbedding, userId, limit, sessionId);
 
     } catch (error) {
         logger.error(`Vector search error: ${error.message}`);
         // Last resort — keyword search
         logger.info('All vector search methods failed. Trying keyword search...');
-        return await keywordSearch(queryText, userId);
+        return await keywordSearch(queryText, userId, limit, sessionId);
     }
 };
 

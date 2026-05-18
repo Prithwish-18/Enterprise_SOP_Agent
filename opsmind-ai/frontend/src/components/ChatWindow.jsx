@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Loader2, Plus, FileUp, Sparkles } from 'lucide-react';
+import { Send, Loader2, Plus, FileUp, Sparkles, Shield } from 'lucide-react';
 import { useChat } from '../hooks/useChat';
 import MessageBubble from './MessageBubble';
 import { uploadSOP } from '../services/api';
+import privateChat from "../assets/private_chat.png"
 
-const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
-    const { messages, isTyping, sendMessage } = useChat();
+const ChatWindow = ({ onUploadSuccess, documents = [], authToken, activeSessionId }) => {
+    const { messages, isTyping, sendMessage, isPrivateMode, masked, materializeGhost, pendingSessionRef } = useChat();
     const [input, setInput] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
@@ -22,7 +23,6 @@ const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
 
     const noDocs = documents.length === 0;
 
-    // Auto-focus input when AI finishes typing
     useEffect(() => {
         if (!isTyping && !noDocs && chatInputRef.current) {
             chatInputRef.current.focus();
@@ -31,11 +31,13 @@ const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (noDocs) return;
-        if (input.trim() && !isTyping) {
-            sendMessage(input);
-            setInput('');
+        if (noDocs) {
+            alert("Please upload a document to begin chatting");
+            return;
         }
+        if (!input.trim() || isTyping) return;
+        sendMessage(input);
+        setInput('');
     };
 
     const handleFileChange = async (e) => {
@@ -43,7 +45,12 @@ const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
             const file = e.target.files[0];
             setIsUploading(true);
             try {
-                await uploadSOP([file], userEmail);
+                let targetSessionId = isPrivateMode ? 'private' : activeSessionId;
+                if (!isPrivateMode && pendingSessionRef?.current && pendingSessionRef.current === activeSessionId) {
+                    const realId = await materializeGhost();
+                    if (realId) targetSessionId = realId;
+                }
+                await uploadSOP([file], authToken, targetSessionId);
                 if (onUploadSuccess) onUploadSuccess();
             } catch (error) {
                 console.error("Upload failed", error);
@@ -55,21 +62,19 @@ const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
     };
 
     return (
-        <div className="flex flex-col h-full w-full max-w-4xl mx-auto p-3 sm:p-4 md:p-6 gap-4">
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+        <div className={`flex flex-col h-full w-full max-w-4xl mx-auto px-3 sm:px-4 md:px-6 pt-0 pb-0 gap-0 transition-all duration-500 overflow-hidden ${isPrivateMode ? 'bg-purple-900/10 shadow-[inset_0_0_50px_rgba(168,85,247,0.05)]' : ''}`}>
+            <div className={`flex-1 overflow-y-auto space-y-4 pt-12 pb-4 pr-1 ${messages.length > 0 ? 'scrollbar-thin' : '[&::-webkit-scrollbar]:hidden'} ${masked ? 'blur-md opacity-50 select-none pointer-events-none transition-all duration-300' : 'transition-all duration-300'}`}>
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4 space-y-4">
-                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-xl"
-                             style={{ background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}>
-                            <Sparkles size={32} className="text-white" />
+                        <div className="items-center justify-center">
+                            {isPrivateMode ? <img src={privateChat} className="h-25 w-30" /> : <img src="/logo.png" className="h-25 w-30" />}
                         </div>
                         <div>
                             <h2 className="text-xl sm:text-2xl font-semibold text-gray-200">
-                                {noDocs ? "Please upload a SOP document first" : "Welcome to OpsMind"}
+                                {noDocs ? "Please upload a SOP document first" : isPrivateMode ? "Private Workspace" : "Welcome to OpsMind Ai"}
                             </h2>
                             <p className="text-gray-500 mt-2 max-w-md text-sm sm:text-base leading-relaxed">
-                                {noDocs ? "You need to upload at least one document before you can start asking questions" : "Ask questions about your uploaded SOPs"}
+                                {noDocs ? "You need to upload at least one document before you can start asking questions" : isPrivateMode ? "Ask me anything. Your chat history will not be saved." : "Ask questions about your uploaded SOPs"}
                             </p>
                             <p className="text-gray-500 mt-1 max-w-md text-sm sm:text-base leading-relaxed">
                                 Use the <strong className="text-gray-400">+</strong> button below to upload documents directly
@@ -78,7 +83,6 @@ const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
                         <div className="flex flex-wrap gap-2 justify-center mt-4">
                             {!noDocs && (
                                 documents.slice(0, 3).map((doc, i) => {
-                                    // Remove extension for cleaner look
                                     const docName = doc.originalName.replace(/\.[^/.]+$/, "");
                                     const questions = [
                                         `Summarize ${docName}`,
@@ -116,41 +120,48 @@ const ChatWindow = ({ onUploadSuccess, documents = [], userEmail }) => {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <form onSubmit={handleSubmit} className="relative mt-auto shrink-0">
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx"
-                    onChange={handleFileChange}/>
-                <div className="glass rounded-xl flex items-center gap-1 p-1.5">
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading || isTyping}
-                        className="p-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-50 shrink-0"
-                        title="Upload Document">
-                        {isUploading ? <Loader2 size={18} className="animate-spin text-blue-400" /> : <Plus size={18} />}
-                    </button>
+            {/* Input — pinned at bottom, padding ensures safe area above iOS home indicator */}
+            <div className="chat-form-bar shrink-0 pt-2 px-1">
+                <form onSubmit={handleSubmit} className="relative">
                     <input
-                        type="text"
-                        ref={chatInputRef}
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder={noDocs ? "Please upload a SOP document first..." : "Ask about your SOPs . . ."}
-                        className={`flex-1 bg-transparent py-2.5 px-2 focus:outline-none text-sm sm:text-base min-w-0 ${noDocs ? 'text-gray-500 placeholder-gray-600 cursor-not-allowed' : 'text-gray-100 placeholder-gray-500'}`}
-                        disabled={isTyping || noDocs}
-                        autoFocus={!noDocs}/>
-                    <button
-                        type="submit"
-                        disabled={isTyping || noDocs || !input.trim()}
-                        className="p-2.5 rounded-lg text-white transition-all disabled:opacity-30 shrink-0"
-                        style={{ background: (!noDocs && input.trim()) ? 'linear-gradient(135deg, #2563eb, #4f46e5)' : 'transparent' }}>
-                        <Send size={18} />
-                    </button>
-                </div>
-            </form>
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.ppt,.pptx"
+                        onChange={handleFileChange} />
+                    <div className="glass rounded-xl flex items-center gap-1 p-1.5">
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading || isTyping}
+                            className={`p-2.5 rounded-lg text-gray-400 transition-all shrink-0 hover:text-white hover:bg-white/5 disabled:opacity-50`}
+                            title="Upload Document">
+                            {isUploading ? <Loader2 size={18} className="animate-spin text-blue-400" /> : <Plus size={18} />}
+                        </button>
+                        <input
+                            type="text"
+                            ref={chatInputRef}
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder={noDocs ? "Please upload a SOP document first..." : isPrivateMode ? "Ask a private question..." : "Ask about your SOPs . . ."}
+                            className={`flex-1 bg-transparent py-2.5 px-2 focus:outline-none text-sm sm:text-base min-w-0 ${noDocs ? 'text-gray-500 placeholder-gray-600 cursor-not-allowed' : 'text-gray-100 placeholder-gray-500'}`}
+                            disabled={isTyping || noDocs}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="sentences"
+                            spellCheck="true"
+                            name="chat-input-message"
+                            autoFocus={!noDocs} />
+                        <button
+                            type="submit"
+                            disabled={isTyping || noDocs || !input.trim()}
+                            className={`p-2.5 rounded-lg text-white transition-all disabled:opacity-30 shrink-0 ${isPrivateMode && input.trim() && !isTyping ? 'shadow-[0_0_15px_rgba(168,85,247,0.4)]' : ''}`}
+                            style={{ background: (!noDocs && input.trim()) ? (isPrivateMode ? 'linear-gradient(135deg, #a855f7, #7e22ce)' : 'linear-gradient(135deg, #2563eb, #4f46e5)') : 'transparent' }}>
+                            <Send size={18} />
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };

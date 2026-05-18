@@ -28,7 +28,7 @@ const LandingPage = () => {
                         state={{ isLogin: false }}
                         className="w-full sm:w-auto py-4 px-8 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 group hover:scale-105"
                         style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)', boxShadow: '0 8px 25px rgba(37,99,235,0.4)' }}>
-                        Get Started <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        Get Started<ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
                     <Link 
                         to="/login"

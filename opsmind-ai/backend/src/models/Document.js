@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const documentSchema = new mongoose.Schema({
     userId: { type: String, required: false, index: true },
+    sessionId: { type: String, required: false, index: true },
     filename: { type: String, required: true },
     originalName: { type: String, required: true },
     uploadDate: { type: Date, default: Date.now },
@@ -9,7 +10,8 @@ const documentSchema = new mongoose.Schema({
     errorMessage: { type: String },
     fileSize: { type: Number },
     mimeType: { type: String },
-    chunkCount: { type: Number, default: 0 }
+    chunkCount: { type: Number, default: 0 },
+    fileData: { type: Buffer }
 },{
     timestamps: true   
 });

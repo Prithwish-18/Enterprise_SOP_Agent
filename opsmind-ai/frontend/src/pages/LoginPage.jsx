@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChatContext } from '../context/ChatContext';
-import { Key, Mail, LogIn, ChevronRight, SkipForward, Sparkles, User, Lock, Eye, EyeOff, Bot, Loader2, AlertCircle } from 'lucide-react';
+import { Key, Mail, LogIn, ChevronRight, SkipForward, Sparkles, User, Lock, Eye, EyeOff, Bot, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { loginUser, signupUser } from '../services/api';
 
 const LoginPage = () => {
@@ -12,21 +12,25 @@ const LoginPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        setNameInput('');
+        setEmailInput('');
+        setPasswordInput('');
+    }, []);
+
+    useEffect(() => {
         if (location.state?.isLogin !== undefined) {
             setIsLogin(location.state.isLogin);
         }
         
-        // If they are already fully authenticated and configured, don't let them sit on the login page
         if (userEmail && apiKey) {
             navigate('/', { replace: true });
         }
     }, [location.state, userEmail, apiKey, navigate]);
     
-    const [nameInput, setNameInput] = useState(localStorage.getItem('opsmind_user_name') || '');
-    const [emailInput, setEmailInput] = useState(userEmail || '');
+    const [nameInput, setNameInput] = useState('');
+    const [emailInput, setEmailInput] = useState('');
     const [passwordInput, setPasswordInput] = useState('');
-    const [keyInput, setKeyInput] = useState(apiKey || '');
-    
+    const [keyInput, setKeyInput] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [authError, setAuthError] = useState('');
@@ -39,19 +43,19 @@ const LoginPage = () => {
                 setAuthError('Name is required for sign up.');
                 return;
             }
-            
             setIsLoading(true);
             try {
                 if (!isLogin) {
-                    await signupUser(nameInput.trim(), emailInput.trim(), passwordInput.trim());
+                    const data = await signupUser(nameInput.trim(), emailInput.trim(), passwordInput.trim());
                     localStorage.setItem('opsmind_user_name', nameInput.trim());
+                    login(emailInput.trim(), data.token);
                 } else {
                     const data = await loginUser(emailInput.trim(), passwordInput.trim());
                     if (data.user?.name) {
                         localStorage.setItem('opsmind_user_name', data.user.name);
                     }
+                    login(emailInput.trim(), data.token);
                 }
-                login(emailInput.trim());
                 setStep(2);
             } catch (err) {
                 setAuthError(err.message);
@@ -75,13 +79,15 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="w-full h-[calc(100vh-64px)] flex items-center justify-center p-4 sm:p-6"
+        <div className="w-full min-h-[calc(100dvh-64px)] flex items-center justify-center p-4 sm:p-6 py-8"
              style={{ background: 'radial-gradient(ellipse at 30% 20%, rgba(59,130,246,0.12), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(99,102,241,0.08), transparent 50%)' }}>
             <div className="w-full max-w-md glass rounded-3xl overflow-hidden shadow-2xl border border-white/10 animate-fade-in relative z-20">
                 {/* Top gradient bar */}
                 <div className="h-1.5 w-full bg-linear-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
-
-                <div className="p-8">
+                <div className="p-8 relative">
+                    <button onClick={() => navigate('/')} className="absolute top-6 left-6 p-2 -ml-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all" title="Back to Home">
+                        <ArrowLeft size={20} />
+                    </button>
                     <div className="text-center mb-8 justify-center">
                         <img src="/logo.png" className="h-16 w-16 object-contain mx-auto"/>
                         <h2 className="text-2xl font-bold mb-2">
@@ -103,12 +109,12 @@ const LoginPage = () => {
                             <div className="flex p-1.5 bg-gray-900/80 rounded-xl border border-gray-800">
                                 <button 
                                     className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${isLogin ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:text-gray-300'}`}
-                                    onClick={() => { setIsLogin(true); setAuthError(''); }}>
+                                    onClick={() => { setIsLogin(true); setAuthError(''); setNameInput(''); setEmailInput(''); setPasswordInput(''); }}>
                                     Log In
                                 </button>
                                 <button 
                                     className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${!isLogin ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:text-gray-300'}`}
-                                    onClick={() => { setIsLogin(false); setAuthError(''); }}>
+                                    onClick={() => { setIsLogin(false); setAuthError(''); setNameInput(''); setEmailInput(''); setPasswordInput(''); }}>
                                     Sign Up
                                 </button>
                             </div>
@@ -139,8 +145,7 @@ const LoginPage = () => {
                                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
                                     <div className="relative group">
                                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={18} />
-                                        <input
-                                            type="email"
+                                        <input type="email"
                                             value={emailInput}
                                             onChange={(e) => setEmailInput(e.target.value)}
                                             placeholder="you@company.com"
@@ -152,8 +157,7 @@ const LoginPage = () => {
                                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
                                     <div className="relative group">
                                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={18} />
-                                        <input
-                                            type={showPassword ? "text" : "password"}
+                                        <input type={showPassword ? "text" : "password"}
                                             value={passwordInput}
                                             onChange={(e) => setPasswordInput(e.target.value)}
                                             placeholder="••••••••"

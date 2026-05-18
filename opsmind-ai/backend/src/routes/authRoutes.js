@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { protect } = require('../middleware/authMiddleware');
+
+const generateToken = (userId) => {
+    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
 
 // Register user
 router.post('/signup', async (req, res, next) => {
@@ -11,6 +17,10 @@ router.post('/signup', async (req, res, next) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+        }
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: 'User already exists with this email' });
@@ -19,8 +29,11 @@ router.post('/signup', async (req, res, next) => {
         const user = new User({ name, email, password });
         await user.save();
 
+        const token = generateToken(user._id);
+
         res.status(201).json({ 
             message: 'User created successfully',
+            token,
             user: { name: user.name, email: user.email, apiKey: user.apiKey }
         });
     } catch (error) {
@@ -47,8 +60,11 @@ router.post('/login', async (req, res, next) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
+        const token = generateToken(user._id);
+
         res.json({ 
             message: 'Login successful',
+            token,
             user: { name: user.name, email: user.email, apiKey: user.apiKey }
         });
     } catch (error) {
@@ -56,16 +72,13 @@ router.post('/login', async (req, res, next) => {
     }
 });
 
-// Update profile
-router.put('/profile', async (req, res, next) => {
+// Update profile — protected: identity comes from JWT, not request body
+router.put('/profile', protect, async (req, res, next) => {
     try {
-        const { email, name, oldPassword, newPassword, apiKey } = req.body;
+        const { name, oldPassword, newPassword, apiKey } = req.body;
         
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required to identify user' });
-        }
-
-        const user = await User.findOne({ email });
+        // Re-fetch user with password field to allow comparison
+        const user = await User.findById(req.user._id);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -73,6 +86,9 @@ router.put('/profile', async (req, res, next) => {
         if (name) user.name = name;
         
         if (newPassword) {
+            if (newPassword.length < 8) {
+                return res.status(400).json({ error: 'New password must be at least 8 characters long' });
+            }
             if (!oldPassword) {
                 return res.status(400).json({ error: 'Old password is required to set a new password' });
             }

@@ -79,7 +79,7 @@ const generateWithRetry = async (ai, prompt) => {
     throw lastError || new Error('All models failed. Please try again later.');
 };
 
-const generateRAGResponse = async (queryText, apiKey, onChunk, userId) => {
+const generateRAGResponse = async (queryText, apiKey, onChunk, userId, isPrivate = false, isDeepResearch = false, sessionId = null) => {
     try {
         const effectiveApiKey = apiKey || process.env.GEMINI_API_KEY;
 
@@ -90,10 +90,13 @@ const generateRAGResponse = async (queryText, apiKey, onChunk, userId) => {
 
         const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
 
-        // 1. Retrieve Context
-        let chunks;
+        let contextString = "";
+        let sources = [];
+        let relevantChunks = [];
+
+        let chunks = [];
         try {
-            chunks = await searchRelevantChunks(queryText, effectiveApiKey, userId);
+            chunks = await searchRelevantChunks(queryText, effectiveApiKey, userId, isDeepResearch, sessionId);
         } catch (searchError) {
             logger.error(`Search failed: ${searchError.message}`);
 
@@ -102,38 +105,33 @@ const generateRAGResponse = async (queryText, apiKey, onChunk, userId) => {
                 return;
             }
 
-            onChunk("I encountered an error searching the knowledge base. Please ensure documents have been uploaded and processed successfully");
+            if (!isPrivate) {
+                onChunk("I encountered an error searching the knowledge base. Please ensure documents have been uploaded and processed successfully");
+                return;
+            }
+        }
+
+        let usedRag = false;
+        if (chunks && chunks.length > 0) {
+            relevantChunks = chunks.filter(c => (c.score || 0) > 0);
+            if (relevantChunks.length > 0) {
+                usedRag = true;
+                logger.info(`Found ${relevantChunks.length} relevant chunks. Top score: ${relevantChunks[0]?.score?.toFixed(4) || 'N/A'}`);
+                relevantChunks.forEach((c, idx) => {
+                    contextString += `[Chunk ${idx + 1} - Source: ${c.documentName}, Page: ${c.page}, Section: ${c.section}]\n${c.text}\n\n`;
+                    sources.push({ documentName: c.documentName, page: c.page, section: c.section });
+                });
+            }
+        }
+
+        if (!usedRag) {
+            logger.warn(`No valid chunks found for query: "${queryText}"`);
+            onChunk("I couldn't find any relevant information in the uploaded documents. Please make sure you've uploaded SOPs related to your question and that they have been fully processed.");
             return;
         }
 
-        if (!chunks || chunks.length === 0) {
-            logger.warn(`No relevant chunks found for query: "${queryText}"`);
-            onChunk("I couldn't find any relevant information in the uploaded documents. Please make sure you've uploaded SOPs related to your question and that they have been fully processed, (status: completed)");
-            return;
-        }
-
-        // Filter out zero-score chunks
-        const relevantChunks = chunks.filter(c => (c.score || 0) > 0);
-
-        if (relevantChunks.length === 0) {
-            logger.warn(`All chunks scored zero for query: "${queryText}"`);
-            onChunk("I found some documents but none were closely related to your question. Could you try rephrasing your query?");
-            return;
-        }
-
-        logger.info(`Found ${relevantChunks.length} relevant chunks. Top score: ${relevantChunks[0]?.score?.toFixed(4) || 'N/A'}`);
-
-        // 2. Build Context String
-        let contextString = "";
-        let sources = [];
-
-        relevantChunks.forEach((c, idx) => {
-            contextString += `[Chunk ${idx + 1} - Source: ${c.documentName}, Page: ${c.page}, Section: ${c.section}]\n${c.text}\n\n`;
-            sources.push({ documentName: c.documentName, page: c.page, section: c.section });
-        });
-
-        // 3. System Prompt — clear, structured instructions
-        const prompt = `You are an enterprise SOP assistant named OpsMind. You help employees find information from their company's Standard Operating Procedures.
+        //  System Prompt — clear, structured instructions
+        let prompt = `You are an enterprise SOP assistant named OpsMind. You help employees find information from their company's Standard Operating Procedures.
 
 RULES:
 - Answer ONLY based on the provided context below. Do NOT use your own knowledge.
@@ -151,8 +149,12 @@ USER QUESTION:
 ${queryText}
 
 Please provide a comprehensive answer based on the context above:`;
+        
+        if (isDeepResearch) {
+            prompt += `\n\n[DEEP RESEARCH ENABLED]: Please be incredibly thorough and exhaustive. Break down your answer into multiple sections with clear headings. Analyze the information deeply and provide a highly detailed, comprehensive research report. Do not summarize briefly; expand on every possible relevant detail.`;
+        }
 
-        // 4. Stream from Gemini with clean retry
+        // Stream from Gemini with clean retry
         try {
             const result = await generateWithRetry(ai, prompt);
 

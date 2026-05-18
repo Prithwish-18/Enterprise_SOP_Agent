@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileUp, Loader2, CheckCircle, AlertCircle, X, File } from 'lucide-react';
 import { uploadSOP } from '../services/api';
 
-const UploadPanel = ({ onUploadSuccess, userEmail }) => {
+const UploadPanel = ({ onUploadSuccess, authToken, sessionId }) => {
     const [files, setFiles] = useState([]);
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
@@ -34,7 +34,7 @@ const UploadPanel = ({ onUploadSuccess, userEmail }) => {
         if (files.length === 0) return;
         setStatus('uploading');
         try {
-            await uploadSOP(files, userEmail);
+            await uploadSOP(files, authToken, sessionId);
             setStatus('success');
             setMessage(`${files.length} document(s) uploaded & processing started!`);
             setFiles([]);
@@ -80,7 +80,7 @@ const UploadPanel = ({ onUploadSuccess, userEmail }) => {
                         multiple
                         className="hidden"
                         onChange={handleFileChange}/>
-                    <div className="w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-3"
+                    <div className="w-20 h-12 mx-auto rounded-xl flex items-center justify-center mb-3"
                          style={{ background: 'rgba(59,130,246,0.1)' }}>
                         <Upload size={22} className="text-blue-400" />
                     </div>
@@ -113,7 +113,7 @@ const UploadPanel = ({ onUploadSuccess, userEmail }) => {
                             className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                             style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)' }}>
                             {status === 'uploading' ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                            {status === 'uploading' ? 'Uploading...' : `Upload ${files.length} file${files.length > 1 ? 's' : ''}`}
+                            {status === 'uploading' ? 'Uploading . . .' : `Upload ${files.length} file${files.length > 1 ? 's' : ''}`}
                         </button>
                     </div>
                 )}

@@ -1,5 +1,6 @@
 const Document = require('../models/Document');
 const Chunk = require('../models/Chunk');
+const ChatSession = require('../models/ChatSession');
 const { parsePDF } = require('../services/pdfParser');
 const { chunkText } = require('../services/chunkService');
 const { generateEmbedding } = require('../services/embeddingService');
@@ -7,6 +8,7 @@ const officeParser = require('officeparser');
 const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -16,7 +18,10 @@ const uploadDocument = async (req, res) => {
     if (files.length === 0) {
         return res.status(400).json({ error: 'No files uploaded' });
     }
-    const userId = req.body.email; // Extracted from frontend form data
+
+    // Identity from JWT — no longer trusted from request body
+    const userId = req.user.email;
+    const sessionId = req.body.sessionId; // Extract sessionId from request body
 
     try {
         let apiKey = req.headers['x-gemini-api-key'];
@@ -26,17 +31,20 @@ const uploadDocument = async (req, res) => {
 
         const results = [];
         for (const file of files) {
+            const filename = Date.now() + '-' + file.originalname.replace(/\s+/g, '_');
             const doc = await Document.create({
                 userId: userId,
-                filename: file.filename,
+                sessionId: sessionId,
+                filename: filename,
                 originalName: file.originalname,
                 fileSize: file.size,
                 mimeType: file.mimetype,
-                status: 'processing'
+                status: 'processing',
+                fileData: file.buffer
             });
             results.push({ documentId: doc._id, name: file.originalname });
             
-            processDocument(doc._id, file.path, apiKey, userId).catch(err => {
+            processDocument(doc._id, file.buffer, filename, apiKey, userId, sessionId).catch(err => {
                 logger.error(`Failed processing doc ${doc._id}: ${err.message}`);
             });
         }
@@ -46,22 +54,29 @@ const uploadDocument = async (req, res) => {
             documents: results
         });
     } catch (error) {
-        logger.error(`Upload error: ${error.message}`);
-        res.status(500).json({ error: 'Server error during upload' });
+        logger.error(`Upload error: ${error.stack}`);
+        res.status(500).json({ error: `Server error during upload: ${error.message}` });
     }
 };
 
-const processDocument = async (docId, filePath, apiKey, userId) => {
+const processDocument = async (docId, fileBuffer, filename, apiKey, userId, sessionId) => {
     try {
         let text = '';
         let totalPages = 1;
         
-        if (filePath.toLowerCase().endsWith('.pdf')) {
-            const parsed = await parsePDF(filePath);
-            text = parsed.text;
-            totalPages = parsed.numpages || 1;
-        } else {
-            text = await officeParser.parseOfficeAsync(filePath);
+        const tempPath = path.join(os.tmpdir(), filename);
+        fs.writeFileSync(tempPath, fileBuffer);
+
+        try {
+            if (filename.toLowerCase().endsWith('.pdf')) {
+                const parsed = await parsePDF(tempPath);
+                text = parsed.text;
+                totalPages = parsed.numpages || 1;
+            } else {
+                text = await officeParser.parseOfficeAsync(tempPath);
+            }
+        } finally {
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         }
 
         if (!text || text.trim().length === 0) {
@@ -95,6 +110,7 @@ const processDocument = async (docId, filePath, apiKey, userId) => {
                     text: chunkStr,
                     embedding: embedding,
                     userId: userId,
+                    sessionId: sessionId,
                     documentId: docId,
                     page: Math.max(1, Math.ceil(((i + 1) / chunks.length) * totalPages)),
                     section: `Section ${i + 1}`
@@ -114,6 +130,7 @@ const processDocument = async (docId, filePath, apiKey, userId) => {
                         text: chunkStr,
                         embedding: [],
                         userId: userId,
+                        sessionId: sessionId,
                         documentId: docId,
                         page: Math.max(1, Math.ceil(((i + 1) / chunks.length) * totalPages)),
                         section: `Section ${i + 1}`
@@ -142,17 +159,38 @@ const processDocument = async (docId, filePath, apiKey, userId) => {
 
 const getDocuments = async (req, res) => {
     try {
-        const email = req.query.email;
-        const query = email ? { userId: email } : {};
-        const docs = await Document.find(query).sort({ createdAt: -1 });
+        // Scope query strictly to the authenticated user and optionally to a specific chat session
+        const sessionId = req.query.sessionId;
+        const query = { userId: req.user.email };
+        if (sessionId) {
+            query.sessionId = sessionId;
+        }
+
+        const docs = await Document.find(query).select('-fileData').sort({ createdAt: -1 });
         const enriched = await Promise.all(docs.map(async (doc) => {
             const docObj = doc.toObject();
             docObj.chunkCount = await Chunk.countDocuments({ documentId: doc._id });
-            // Count how many chunks have valid embeddings
             docObj.embeddedChunks = await Chunk.countDocuments({ 
                 documentId: doc._id, 
                 'embedding.0': { $exists: true } 
             });
+            
+        if (docObj.sessionId && docObj.sessionId !== 'private') {
+                // Guard: only query MongoDB if sessionId looks like a valid ObjectId (24 hex chars)
+                const isValidObjectId = /^[a-f\d]{24}$/i.test(docObj.sessionId);
+                if (isValidObjectId) {
+                    const session = await ChatSession.findById(docObj.sessionId).lean();
+                    docObj.chatTitle = session ? session.title : 'Deleted Chat';
+                } else {
+                    // Ghost session (e.g. "ghost-1234") — not yet persisted in DB
+                    docObj.chatTitle = 'New Chat';
+                }
+            } else if (docObj.sessionId === 'private') {
+                docObj.chatTitle = 'Private Chat';
+            } else {
+                docObj.chatTitle = 'Global (No Chat)';
+            }
+            
             return docObj;
         }));
         res.json(enriched);
@@ -165,20 +203,12 @@ const getDocuments = async (req, res) => {
 const deleteDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const email = req.query.email;
-        
-        const query = { _id: id };
-        if (email) query.userId = email;
 
-        const doc = await Document.findOne(query);
-        if (!doc) return res.status(404).json({ error: 'Document not found' });
+        // Ownership check — must belong to the authenticated user
+        const doc = await Document.findOne({ _id: id, userId: req.user.email });
+        if (!doc) return res.status(404).json({ error: 'Document not found or access denied' });
 
         await Chunk.deleteMany({ documentId: id });
-        try {
-            const fp = path.join('uploads', doc.filename);
-            if (fs.existsSync(fp)) fs.unlinkSync(fp);
-        } catch (e) {}
-
         await Document.findByIdAndDelete(id);
         res.json({ message: 'Document deleted successfully' });
     } catch (error) {
@@ -187,4 +217,64 @@ const deleteDocument = async (req, res) => {
     }
 };
 
-module.exports = { uploadDocument, getDocuments, deleteDocument };
+/**
+ * Secure authenticated file download.
+ * Replaces public static /uploads serving.
+ * Checks ownership before streaming the file.
+ */
+const downloadDocument = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const doc = await Document.findOne({ _id: id, userId: req.user.email });
+        if (!doc) return res.status(404).json({ error: 'Document not found or access denied' });
+
+        if (doc.fileData) {
+            res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
+            res.setHeader('Content-Disposition', `inline; filename="${doc.originalName}"`);
+            return res.send(Buffer.from(doc.fileData));
+        } else if (doc.filename) {
+            // Fallback for legacy documents stored on disk before the memoryStorage migration
+            const filePath = path.resolve(__dirname, '../../uploads', doc.filename);
+            if (fs.existsSync(filePath)) {
+                res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
+                res.setHeader('Content-Disposition', `inline; filename="${doc.originalName}"`);
+                return res.sendFile(filePath);
+            }
+        }
+        
+        return res.status(404).json({ error: 'Document file data not found on server or database' });
+    } catch (error) {
+        logger.error(`Error downloading document: ${error.message}`);
+        res.status(500).json({ error: 'Server error downloading document' });
+    }
+};
+
+const deleteAllDocuments = async (req, res) => {
+    try {
+        const docs = await Document.find({ userId: req.user.email });
+        for (const doc of docs) {
+            await Chunk.deleteMany({ documentId: doc._id });
+        }
+        await Document.deleteMany({ userId: req.user.email });
+        res.json({ message: 'All documents deleted successfully' });
+    } catch (error) {
+        logger.error(`Error deleting all documents: ${error.message}`);
+        res.status(500).json({ error: 'Server error deleting all documents' });
+    }
+};
+
+const deletePrivateDocuments = async (req, res) => {
+    try {
+        const docs = await Document.find({ userId: req.user.email, sessionId: 'private' });
+        for (const doc of docs) {
+            await Chunk.deleteMany({ documentId: doc._id });
+        }
+        await Document.deleteMany({ userId: req.user.email, sessionId: 'private' });
+        res.json({ message: 'Private documents deleted successfully' });
+    } catch (error) {
+        logger.error(`Error deleting private documents: ${error.message}`);
+        res.status(500).json({ error: 'Server error deleting private documents' });
+    }
+};
+
+module.exports = { uploadDocument, getDocuments, deleteDocument, downloadDocument, deleteAllDocuments, deletePrivateDocuments };

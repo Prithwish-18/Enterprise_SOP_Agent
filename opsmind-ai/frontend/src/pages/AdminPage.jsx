@@ -5,15 +5,14 @@ import { getDocuments, deleteDocument } from '../services/api';
 import { FileText, Trash2, Loader2, CheckCircle, AlertCircle, Clock, RefreshCw, Database, File, Zap, AlertTriangle } from 'lucide-react';
 
 const AdminPage = () => {
-    const { userEmail } = useContext(ChatContext);
+    const { authToken, activeSessionId } = useContext(ChatContext);
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState(null);
-
     const fetchDocs = async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const data = await getDocuments(userEmail);
+            const data = await getDocuments(authToken);
             setDocuments(data);
         } catch (error) {
             console.error('Failed to fetch documents', error);
@@ -22,18 +21,16 @@ const AdminPage = () => {
         }
     };
 
-    // Initial fetch
     useEffect(() => {
         fetchDocs();
     }, []);
 
-    // Polling for processing documents
     useEffect(() => {
         let intervalId;
         const hasProcessing = documents.some(doc => doc.status === 'processing');
         if (hasProcessing) {
             intervalId = setInterval(() => {
-                fetchDocs(true); // silent fetch
+                fetchDocs(true); 
             }, 3000);
         }
         return () => {
@@ -47,7 +44,7 @@ const AdminPage = () => {
         }
         setDeletingId(docId);
         try {
-            await deleteDocument(docId, userEmail);
+            await deleteDocument(docId, authToken);
             setDocuments(prev => prev.filter(d => d._id !== docId));
         } catch (error) {
             console.error('Failed to delete document', error);
@@ -63,14 +60,12 @@ const AdminPage = () => {
         }
         setLoading(true);
         try {
-            // Delete sequentially to avoid rate limiting or timeouts, or if there's a bulk API, use it.
-            // Since we only have deleteDocument(id), we'll map over them.
-            await Promise.all(documents.map(doc => deleteDocument(doc._id)));
+            await Promise.all(documents.map(doc => deleteDocument(doc._id, authToken)));
             setDocuments([]);
         } catch (error) {
             console.error('Failed to delete all documents', error);
             alert('An error occurred while deleting some documents.');
-            fetchDocs(); // Refresh to see what's left
+            fetchDocs(); 
         } finally {
             setLoading(false);
         }
@@ -115,7 +110,7 @@ const AdminPage = () => {
                 </div>
 
                 {/* Upload Panel */}
-                <UploadPanel onUploadSuccess={fetchDocs} userEmail={userEmail} />
+                <UploadPanel onUploadSuccess={fetchDocs} authToken={authToken} sessionId={activeSessionId} />
 
                 {/* Documents List */}
                 <div className="glass rounded-2xl overflow-hidden">
@@ -132,7 +127,7 @@ const AdminPage = () => {
                                     disabled={loading}
                                     className="flex items-center gap-1.5 text-sm text-red-400 hover:text-white transition-colors disabled:opacity-50 px-3 py-1.5 rounded-lg hover:bg-red-500/20"
                                     title="Delete All Documents">
-                                    <Trash2 size={14} />
+                                    <Trash2 size={15} />
                                     <span className="hidden sm:inline">Delete All</span>
                                 </button>
                             )}
@@ -140,7 +135,7 @@ const AdminPage = () => {
                                 onClick={fetchDocs}
                                 disabled={loading}
                                 className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors disabled:opacity-50 px-3 py-1.5 rounded-lg hover:bg-white/5">
-                                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
                                 <span className="hidden sm:inline">Refresh</span>
                             </button>
                         </div>
@@ -150,7 +145,7 @@ const AdminPage = () => {
                         {loading ? (
                             <div className="flex items-center gap-3 py-12 justify-center text-gray-500">
                                 <Loader2 size={20} className="animate-spin" />
-                                <span>Loading documents...</span>
+                                <span>Loading documents . . . </span>
                             </div>
                         ) : documents.length === 0 ? (
                             <div className="text-center py-12">
@@ -158,7 +153,7 @@ const AdminPage = () => {
                                     <FileText size={32} className="text-gray-600" />
                                 </div>
                                 <p className="text-gray-400 font-medium">No documents uploaded yet</p>
-                                <p className="text-gray-600 text-sm mt-1">Upload your first SOP using the panel above.</p>
+                                <p className="text-gray-600 text-sm mt-1">Upload your first SOP using the panel above</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -178,11 +173,11 @@ const AdminPage = () => {
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
                                                 <a 
-                                                    href={`/uploads/${doc.filename}`}
+                                                    href={`${import.meta.env.VITE_API_URL || ''}/api/admin/documents/${doc._id}/download?token=${authToken}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="block text-sm font-medium text-blue-300 hover:text-blue-400 hover:underline truncate cursor-pointer transition-colors" 
-                                                    title={`View ${doc.originalName}`}>
+                                                    title={`Download ${doc.originalName}`}>
                                                     {doc.originalName}
                                                 </a>
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
@@ -191,6 +186,11 @@ const AdminPage = () => {
                                                     {doc.chunkCount > 0 && (
                                                         <span className="text-xs text-gray-600">
                                                             {`${doc.chunkCount} chunks`}
+                                                        </span>
+                                                    )}
+                                                    {doc.chatTitle && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                                            Chat: {doc.chatTitle}
                                                         </span>
                                                     )}
                                                 </div>

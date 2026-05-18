@@ -2,7 +2,9 @@ const { generateRAGResponse } = require('../services/ragService');
 const logger = require('../utils/logger');
 
 const streamQuery = async (req, res) => {
-    const { query, email } = req.body;
+    const { query, isPrivate, isDeepResearch, sessionId } = req.body;
+    // Identity comes from JWT — req.user is set by the protect middleware
+    const email = req.user.email;
     
     // Resolve API key: ignore placeholder values and empty strings
     let apiKey = req.headers['x-gemini-api-key'];
@@ -29,7 +31,7 @@ const streamQuery = async (req, res) => {
     };
 
     try {
-        await generateRAGResponse(query, apiKey, onChunk, email);
+        await generateRAGResponse(query, apiKey, onChunk, email, isPrivate, isDeepResearch, sessionId);
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();
     } catch (error) {
