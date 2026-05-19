@@ -6,17 +6,34 @@ export const ChatContext = createContext();
 export const ChatProvider = ({ children }) => {
     const [userEmail, setUserEmail] = useState(() => localStorage.getItem('opsmind_user_email') || null);
     const [authToken, setAuthToken] = useState(() => localStorage.getItem('opsmind_token') || null);
-    const [isPrivateMode, setIsPrivateMode] = useState(false);
-    const [privateMessages, setPrivateMessages] = useState([]);
-    const [masked, setMasked] = useState(false);
-    const [lockPassword, setLockPassword] = useState('');
-    const [lockAttempts, setLockAttempts] = useState(0);
+    const [isPrivateMode, setIsPrivateMode] = useState(() => sessionStorage.getItem('opsmind_private_mode') === 'true');
+    const [privateMessages, setPrivateMessages] = useState(() => {
+        try { return JSON.parse(sessionStorage.getItem('opsmind_private_messages') || '[]'); } catch { return []; }
+    });
+    const [masked, setMasked] = useState(() => sessionStorage.getItem('opsmind_private_masked') === 'true');
+    const [lockPassword, setLockPassword] = useState(() => sessionStorage.getItem('opsmind_private_lock_password') || '');
+    const [lockAttempts, setLockAttempts] = useState(() => parseInt(sessionStorage.getItem('opsmind_private_lock_attempts') || '0'));
     const [isDeepResearch, setIsDeepResearch] = useState(false);
     const [apiKey, setApiKey] = useState(() => localStorage.getItem('opsmind_gemini_key') || null);
     const [sessions, setSessions] = useState([]);
     const [activeSessionId, setActiveSessionId] = useState(null);
     const [isTyping, setIsTyping] = useState(false);
     const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+    const [archivedIds, setArchivedIds] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('opsmind_archived_chats') || '[]'); } catch { return []; }
+    });
+
+    const archiveSession = (sessionId) => {
+        const updated = [...archivedIds, sessionId];
+        setArchivedIds(updated);
+        localStorage.setItem('opsmind_archived_chats', JSON.stringify(updated));
+    };
+
+    const unarchiveSession = (sessionId) => {
+        const updated = archivedIds.filter(id => id !== sessionId);
+        setArchivedIds(updated);
+        localStorage.setItem('opsmind_archived_chats', JSON.stringify(updated));
+    };
     const heartbeatRef = useRef(null);
     useEffect(() => {
         if (!authToken) { clearInterval(heartbeatRef.current); return; }
@@ -213,6 +230,26 @@ export const ChatProvider = ({ children }) => {
         localStorage.setItem('opsmind_gemini_key', key);
     };
 
+    useEffect(() => {
+        sessionStorage.setItem('opsmind_private_mode', isPrivateMode);
+    }, [isPrivateMode]);
+
+    useEffect(() => {
+        sessionStorage.setItem('opsmind_private_messages', JSON.stringify(privateMessages));
+    }, [privateMessages]);
+
+    useEffect(() => {
+        sessionStorage.setItem('opsmind_private_masked', masked);
+    }, [masked]);
+
+    useEffect(() => {
+        sessionStorage.setItem('opsmind_private_lock_password', lockPassword);
+    }, [lockPassword]);
+
+    useEffect(() => {
+        sessionStorage.setItem('opsmind_private_lock_attempts', lockAttempts);
+    }, [lockAttempts]);
+
     const logout = () => {
         setUserEmail(null);
         setAuthToken(null);
@@ -221,11 +258,15 @@ export const ChatProvider = ({ children }) => {
         setActiveSessionId(null);
         setIsPrivateMode(false);
         setPrivateMessages([]);
+        setMasked(false);
+        setLockPassword('');
+        setLockAttempts(0);
         localStorage.removeItem('opsmind_user_email');
         localStorage.removeItem('opsmind_token');
         localStorage.removeItem('opsmind_gemini_key');
         localStorage.removeItem('opsmind_active_session');
         localStorage.removeItem('opsmind_device_sessions');
+        sessionStorage.clear();
     };
 
     useEffect(() => {
@@ -271,6 +312,26 @@ export const ChatProvider = ({ children }) => {
         }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
     };
 
+    const importSharedSession = async (title, sharedMessages) => {
+        if (!userEmail || !authToken) return null;
+        try {
+            const newSession = await createSession(title, authToken);
+            const realId = newSession.id || newSession._id;
+            await updateSession(realId, { messages: sharedMessages }, authToken);
+            const data = await getSessions(authToken);
+            const formatted = data
+                .map(s => ({ ...s, id: s._id }))
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            setSessions(formatted);
+            setIsPrivateMode(false);
+            setActiveSessionId(realId);
+            return realId;
+        } catch (error) {
+            console.error("Failed to import shared session:", error);
+            throw error;
+        }
+    };
+
     const updateLastMessage = (text, sources) => {
         if (isPrivateMode) {
             setPrivateMessages(prev => {
@@ -309,7 +370,8 @@ export const ChatProvider = ({ children }) => {
             userEmail, authToken, apiKey, login, saveApiKey, logout,
             isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages,
             masked, setMasked, lockPassword, setLockPassword, lockAttempts, setLockAttempts,
-            materializeGhost, pendingSessionRef
+            materializeGhost, pendingSessionRef, importSharedSession,
+            archivedIds, archiveSession, unarchiveSession
         }}>
             {children}
         </ChatContext.Provider>

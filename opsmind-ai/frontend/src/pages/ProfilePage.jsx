@@ -17,12 +17,14 @@ const InfoRow = ({ label, value, mono, badge }) => (
 );
 
 const Tile = ({ icon: Icon, label, value, color }) => (
-  <div className="p-4 rounded-2xl flex flex-col gap-3" style={{ background: `${color}0d`, border: `1px solid ${color}20` }}>
+  <div className="p-4 rounded-2xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_24px_-8px_rgba(99,102,241,0.2)]" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))', border: `1px solid rgba(255,255,255,0.05)`, boxShadow: `inset 0 0 12px ${color}08` }}>
     <div className="flex items-center gap-2">
-      <Icon size={13} style={{ color }} />
-      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">{label}</span>
+      <div className="p-1.5 rounded-lg" style={{ background: `${color}12` }}>
+        <Icon size={14} style={{ color }} />
+      </div>
+      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</span>
     </div>
-    <p className="text-sm font-bold text-white leading-tight">{value}</p>
+    <p className="text-base font-bold text-white leading-tight mt-1">{value}</p>
   </div>
 );
 
@@ -298,39 +300,39 @@ const ProfilePage = () => {
 
         <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'linear-gradient(145deg,#0f0d26,#090d1f)' }}>
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-white/5 flex items-center justify-between">
-            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-gray-500"> Currently Logged In Devices</p>
+            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-gray-500">Currently Logged In Devices</p>
             <div className="flex items-center gap-2">
               {!sessionsLoading && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">
-                  {activeSessions.length} device{activeSessions.length !== 1 ? 's' : ''}
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20">
+                  {activeSessions.length} active
                 </span>
               )}
               <button onClick={fetchSessions} title="Refresh"
-                className="rounded-lg text-gray-600 hover:text-gray-300">
-                {sessionsLoading ? <Loader2 size={12} className="animate-spin text-blue-400" /> : <span className="text-[25px]">↻</span>}
+                className="rounded-lg text-gray-400 hover:text-white transition-colors p-1">
+                {sessionsLoading ? <Loader2 size={12} className="animate-spin text-indigo-400" /> : <span className="text-lg">↻</span>}
               </button>
             </div>
           </div>
           <div className="p-4 sm:p-5 space-y-3">
             {sessionsLoading ? (
               <div className="flex items-center gap-2 text-xs text-gray-500 py-4 justify-center">
-                <Loader2 size={14} className="animate-spin" /> Loading devices . . .
+                <Loader2 size={14} className="animate-spin" /> Loading active devices...
               </div>
             ) : activeSessions.length === 0 ? (
               <p className="text-xs text-gray-600 text-center py-4">No active sessions found</p>
             ) : (
               activeSessions.map((device) => {
                 const DeviceIcon = device.deviceType === 'Mobile' ? Smartphone : device.deviceType === 'Tablet' ? Monitor : Laptop;
-                const accentColor = device.isCurrent ? '#10b981' : device.isOnline ? '#3b82f6' : '#6b7280';
+                const accentColor = device.isCurrent ? '#10b981' : device.isOnline ? '#6366f1' : '#6b7280';
                 const lastSeenStr = device.isOnline
                   ? 'Active right now'
                   : `Last seen ${new Date(device.lastSeen).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
                 return (
-                  <div key={device.id} className="flex items-center justify-between p-3 sm:p-4 rounded-xl border relative overflow-hidden"
+                  <div key={device.id} className="flex items-center justify-between p-3 sm:p-4 rounded-xl border relative overflow-hidden transition-all hover:scale-[1.01] duration-300"
                     style={{ borderColor: device.isCurrent ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)', background: device.isCurrent ? 'rgba(16,185,129,0.04)' : 'rgba(255,255,255,0.02)' }}>
-                    <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl" style={{ background: accentColor }} />
+                    <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl animate-pulse" style={{ background: accentColor }} />
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0"
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
                         style={{ background: `${accentColor}18`, border: `1px solid ${accentColor}30` }}>
                         <DeviceIcon size={15} style={{ color: accentColor }} />
                       </div>
@@ -338,24 +340,17 @@ const ProfilePage = () => {
                         <p className="text-xs sm:text-sm font-semibold text-gray-100 flex flex-wrap items-center gap-1.5">
                           {device.os} · {device.deviceType}
                           {device.isCurrent && (
-                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 uppercase font-bold tracking-wider">This Device</span>
+                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 uppercase font-bold tracking-wider border border-emerald-500/30">Your Device</span>
                           )}
                           {device.isOnline && !device.isCurrent && (
-                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 uppercase font-bold">Online</span>
+                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 uppercase font-bold border border-indigo-500/30">Online</span>
                           )}
                         </p>
-                        <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 truncate">
+                        <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 truncate">
                           {device.browser} • {lastSeenStr}
                         </p>
                       </div>
                     </div>
-                    {!device.isCurrent && (
-                      <button onClick={() => handleRevoke(device.id)} disabled={revokingId === device.id}
-                        className="ml-2 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40 shrink-0"
-                        title="Sign out this device">
-                        {revokingId === device.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                      </button>
-                    )}
                   </div>
                 );
               })

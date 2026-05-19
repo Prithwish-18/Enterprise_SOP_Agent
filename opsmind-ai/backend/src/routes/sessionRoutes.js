@@ -56,7 +56,7 @@ router.get('/sessions', protect, async (req, res, next) => {
 
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-        const result = sessions.map(s => ({
+        const mapped = sessions.map(s => ({
             id: s._id,
             os: s.os,
             browser: s.browser,
@@ -67,16 +67,23 @@ router.get('/sessions', protect, async (req, res, next) => {
             isOnline: s.lastSeen >= fiveMinutesAgo,
         }));
 
+        const seenDevices = new Set();
+        const result = [];
+
+        for (const item of mapped) {
+            const key = `${item.os.toLowerCase()}-${item.browser.toLowerCase()}-${item.deviceType.toLowerCase()}`;
+            if (item.isCurrent || !seenDevices.has(key)) {
+                result.push(item);
+                seenDevices.add(key);
+            }
+        }
+
         res.json(result);
     } catch (error) {
         next(error);
     }
 });
 
-/**
- * DELETE /api/auth/sessions/:id
- * Force-revoke a specific session (sign out that device).
- */
 router.delete('/sessions/:id', protect, async (req, res, next) => {
     try {
         await UserSession.findOneAndDelete({ _id: req.params.id, userId: req.user._id });

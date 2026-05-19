@@ -38,6 +38,12 @@ const AdminPage = () => {
         };
     }, [documents]);
 
+    useEffect(() => {
+        const handleCleared = () => setDocuments([]);
+        window.addEventListener('documents-cleared', handleCleared);
+        return () => window.removeEventListener('documents-cleared', handleCleared);
+    }, []);
+
     const handleDelete = async (docId, docName) => {
         if (!window.confirm(`Delete "${docName}"?\n\nThis will permanently remove the document and all its indexed chunks.`)) {
             return;

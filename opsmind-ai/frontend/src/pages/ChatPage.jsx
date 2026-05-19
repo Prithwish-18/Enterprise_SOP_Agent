@@ -51,6 +51,12 @@ const ChatPage = () => {
         return () => clearInterval(pollingRef.current);
     }, [documents]);
 
+    useEffect(() => {
+        const handleCleared = () => setDocuments([]);
+        window.addEventListener('documents-cleared', handleCleared);
+        return () => window.removeEventListener('documents-cleared', handleCleared);
+    }, []);
+
     const handleDelete = async (docId, name) => {
         if (!window.confirm(`Delete "${name}"? This will remove the document and all its indexed data.`)) return;
         setDeletingId(docId);

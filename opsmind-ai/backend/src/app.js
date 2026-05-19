@@ -12,6 +12,8 @@ const sessionRoutes = require('./routes/sessionRoutes');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(helmet());
 
 // Restrict CORS to the deployed frontend only
@@ -44,7 +46,7 @@ app.use(cors({
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20,
-    message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+    message: { error: 'Too many login attempts, Please try again in 15 minutes' },
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -72,9 +74,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // Routes
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/auth/sessions/heartbeat', heartbeatLimiter); // generous limiter for 30s pings
-app.use('/api/auth', apiLimiter, sessionRoutes);
+app.use('/api/auth/sessions/heartbeat', heartbeatLimiter);
+app.use('/api/auth', sessionRoutes);          // /sessions, /sessions/:id, /sessions/heartbeat
+app.use('/api/auth', authLimiter, authRoutes); // /login, /signup, /profile
 app.use('/api/admin', apiLimiter, adminRoutes);
 app.use('/api/query', apiLimiter, queryRoutes);
 app.use('/api/chat', chatRoutes);

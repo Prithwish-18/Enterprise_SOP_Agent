@@ -143,7 +143,7 @@ const PrivateChatPage = () => {
                 <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 scrollbar-thin">
                     {loading ? (
                         <div className="flex items-center gap-2 text-xs text-purple-400/50 p-3 animate-pulse">
-                            <Loader2 size={13} className="animate-spin" /> Loading…
+                            <Loader2 size={13} className="animate-spin" /> Loading . . .
                         </div>
                     ) : documents.length === 0 ? (
                         <div className="flex flex-col items-center gap-3 py-10 text-center">

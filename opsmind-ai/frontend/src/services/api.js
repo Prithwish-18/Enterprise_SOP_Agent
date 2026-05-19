@@ -157,14 +157,27 @@ export const deletePrivateDocumentsApi = async (token) => {
 };
 
 export const sendHeartbeat = async (token, deviceInfo) => {
-    try {
-        await fetch(`${BASE_URL}/api/auth/sessions/heartbeat`, {
+    const doSend = () =>
+        fetch(`${BASE_URL}/api/auth/sessions/heartbeat`, {
             method: 'POST',
             headers: getAuthHeaders(token),
             body: JSON.stringify(deviceInfo),
         });
-    } catch (_) { /* silent — non-critical */ }
+    try {
+        const res = await doSend();
+        if (res.status >= 500) {
+            await new Promise(r => setTimeout(r, 2000));
+            await doSend();
+        }
+    } catch (err) {
+        
+        try {
+            await new Promise(r => setTimeout(r, 2000));
+            await doSend();
+        } catch (_) { /* silent after retry */ }
+    }
 };
+
 
 /** Fetch all active device sessions for the logged-in user */
 export const getActiveSessions = async (token) => {
@@ -175,13 +188,18 @@ export const getActiveSessions = async (token) => {
     return response.json();
 };
 
-/** Revoke (sign out) a specific session by its id */
 export const revokeSession = async (sessionId, token) => {
     const response = await fetch(`${BASE_URL}/api/auth/sessions/${sessionId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(token),
     });
     await handleResponseErrors(response, 'Failed to revoke session');
+    return response.json();
+};
+
+export const getSharedSession = async (sessionId) => {
+    const response = await fetch(`${BASE_URL}/api/chat/sessions/share/${sessionId}`);
+    await handleResponseErrors(response, 'Failed to fetch shared session');
     return response.json();
 };
 

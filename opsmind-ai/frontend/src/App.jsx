@@ -8,6 +8,7 @@ import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import ProfilePage from './pages/ProfilePage';
+import SharedChatPage from './pages/SharedChatPage';
 import ArchivedChatsModal from './components/ArchivedChatsModal';
 import { Menu, X, MessageSquare, Upload, LogOut, User, Settings, Shield, Eye, EyeOff, Archive, Trash2, Database, Lock, Beaker, Zap, Key, Save } from 'lucide-react';
 import { deleteAllDocumentsApi, deletePrivateDocumentsApi } from './services/api';
@@ -31,18 +32,30 @@ const HomeRoute = () => {
 };
 
 const NavBar = () => {
-  const { userEmail, logout, isPrivateMode, setIsPrivateMode, setPrivateMessages, masked, setMasked, clearAllSessions, authToken, sessions, setLockPassword, deleteSession, switchSession, isDeepResearch, setIsDeepResearch, apiKey, saveApiKey } = useContext(ChatContext);
+  const { userEmail, logout, isPrivateMode, setIsPrivateMode, setPrivateMessages, masked, setMasked, clearAllSessions, authToken, sessions, setLockPassword, deleteSession, switchSession, isDeepResearch, setIsDeepResearch, apiKey, saveApiKey, archivedIds, unarchiveSession } = useContext(ChatContext);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [archivedModalOpen, setArchivedModalOpen] = useState(false);
   const [setPasswordModalOpen, setSetPasswordModalOpen] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
   const [normalLockModalOpen, setNormalLockModalOpen] = useState(false);
-  const [normalLockPassword, setNormalLockPassword] = useState('');
-  const [normalLocked, setNormalLocked] = useState(false);
+  const [normalLockPassword, setNormalLockPassword] = useState(() => localStorage.getItem('opsmind_normal_lock_password') || '');
+  const [normalLocked, setNormalLocked] = useState(() => localStorage.getItem('opsmind_normal_locked') === 'true');
   const [normalLockInput, setNormalLockInput] = useState('');
-  const [normalLockAttempts, setNormalLockAttempts] = useState(0);
+  const [normalLockAttempts, setNormalLockAttempts] = useState(() => parseInt(localStorage.getItem('opsmind_normal_lock_attempts') || '0'));
   const [normalLockError, setNormalLockError] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('opsmind_normal_locked', normalLocked);
+  }, [normalLocked]);
+
+  useEffect(() => {
+    localStorage.setItem('opsmind_normal_lock_password', normalLockPassword);
+  }, [normalLockPassword]);
+
+  useEffect(() => {
+    localStorage.setItem('opsmind_normal_lock_attempts', normalLockAttempts);
+  }, [normalLockAttempts]);
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const [tempKey, setTempKey] = useState('');
   const [showTempKey, setShowTempKey] = useState(false);
@@ -140,7 +153,7 @@ const NavBar = () => {
       try {
         await deleteAllDocumentsApi(authToken);
         alert("All documents deleted successfully");
-        window.location.reload();
+        window.dispatchEvent(new Event('documents-cleared'));
       } catch (e) {
         alert("Failed to delete documents: " + e.message);
       }
@@ -153,20 +166,11 @@ const NavBar = () => {
   };
 
   const getArchivedChats = () => {
-    try {
-      const archivedIds = JSON.parse(localStorage.getItem('opsmind_archived_chats') || '[]');
-      return sessions.filter(s => archivedIds.includes(s.id));
-    } catch { return []; }
+    return sessions.filter(s => archivedIds.includes(s.id));
   };
 
   const handleUnarchive = (sessionId) => {
-    try {
-      const archivedIds = JSON.parse(localStorage.getItem('opsmind_archived_chats') || '[]');
-      const updated = archivedIds.filter(id => id !== sessionId);
-      localStorage.setItem('opsmind_archived_chats', JSON.stringify(updated));
-      setArchivedModalOpen(false);
-      setTimeout(() => setArchivedModalOpen(true), 50);
-    } catch (e) { console.error(e); }
+    unarchiveSession(sessionId);
   };
 
   const handleDeleteArchived = (sessionId) => {
@@ -432,11 +436,11 @@ const NavBar = () => {
               </div>
             </div>
             <h2 className="text-xl font-bold text-white text-center mb-2">Gemini API Key</h2>
-            <p className="text-sm text-gray-400 text-center mb-6">Your key is stored locally and never sent to our servers.</p>
+            <p className="text-sm text-gray-400 text-center mb-6">Your key is stored locally and never sent to our servers</p>
             
             <form onSubmit={handleSaveApiKey} className="flex flex-col gap-4">
               <div className="p-3.5 rounded-xl text-xs text-amber-300/80 leading-relaxed" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                <strong className="text-amber-300">How it works:</strong> Enter your personal Gemini API key to use your own quota. Leave blank to use the shared server key.
+                <strong className="text-amber-300">How it works:</strong> Enter your personal Gemini API key to use your own quota. Leave blank to use the shared server key
               </div>
               
               <div className="relative">
@@ -583,6 +587,7 @@ const AppContent = () => {
             <Route path="/chat" element={<ProtectedRoute>{isPrivateMode ? <PrivateChatPage /> : <ChatPage />}</ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/share/:sessionId" element={<SharedChatPage />} />
           </Routes>
       </main>
 

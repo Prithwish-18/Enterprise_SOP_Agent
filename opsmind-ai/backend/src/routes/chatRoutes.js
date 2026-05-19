@@ -4,6 +4,17 @@ const ChatSession = require('../models/ChatSession');
 const { protect } = require('../middleware/authMiddleware');
 const { cleanupOldData } = require('../utils/cleanup');
 
+// Public endpoint to retrieve a shared chat session (no auth required)
+router.get('/sessions/share/:id', async (req, res, next) => {
+    try {
+        const session = await ChatSession.findById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'Shared session not found' });
+        res.json(session);
+    } catch (error) {
+        next(error);
+    }
+});
+
 // All session routes are protected — identity comes from JWT
 router.get('/sessions', protect, async (req, res, next) => {
     try {

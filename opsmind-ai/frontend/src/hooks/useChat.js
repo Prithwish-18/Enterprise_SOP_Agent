@@ -6,7 +6,8 @@ export const useChat = () => {
     const { 
         messages, addMessage, updateLastMessage, isTyping, setIsTyping, apiKey, authToken,
         sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession,
-        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages
+        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages,
+        archivedIds, archiveSession, unarchiveSession
     } = useContext(ChatContext);
 
     const sendMessage = async (query) => {
@@ -41,6 +42,7 @@ export const useChat = () => {
     return { 
         messages, isTyping, sendMessage,
         sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession,
-        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages
+        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages,
+        archivedIds, archiveSession, unarchiveSession
     };
 };

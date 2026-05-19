@@ -65,13 +65,11 @@ const ChatHistory = ({ isOpen, setOpen }) => {
     const {
         sessions, activeSessionId, createNewSession, switchSession, deleteSession,
         clearAllSessions, renameSession,
-        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages
+        isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages,
+        archivedIds, archiveSession, unarchiveSession
     } = useChat();
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [archivedIds, setArchivedIds] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('opsmind_archived_chats') || '[]'); } catch { return []; }
-    });
     const [showArchived, setShowArchived] = useState(false);
     const [showPrivateModal, setShowPrivateModal] = useState(false);
     const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -103,9 +101,7 @@ const ChatHistory = ({ isOpen, setOpen }) => {
 
     const handleArchive = (e, sessionId) => {
         e.stopPropagation();
-        const updated = [...archivedIds, sessionId];
-        setArchivedIds(updated);
-        localStorage.setItem('opsmind_archived_chats', JSON.stringify(updated));
+        archiveSession(sessionId);
         if (activeSessionId === sessionId) {
             const remaining = activeSessions.filter(s => s.id !== sessionId);
             if (remaining.length > 0) switchSession(remaining[0].id);
@@ -115,9 +111,7 @@ const ChatHistory = ({ isOpen, setOpen }) => {
 
     const handleUnarchive = (e, sessionId) => {
         e.stopPropagation();
-        const updated = archivedIds.filter(id => id !== sessionId);
-        setArchivedIds(updated);
-        localStorage.setItem('opsmind_archived_chats', JSON.stringify(updated));
+        unarchiveSession(sessionId);
     };
 
     const SessionCard = ({ session, isArchived = false, isLast = false }) => {
@@ -312,11 +306,11 @@ const ChatHistory = ({ isOpen, setOpen }) => {
                         ) : filteredActive.length === 0 && searchQuery ? (
                             <div className="text-xs text-gray-500 p-4 text-center">No chats match your search</div>
                         ) : activeSessions.length === 0 ? (
-                            <div className="text-xs text-gray-500 p-4 text-center border border-dashed border-white/10 rounded-xl">
-                                No chats yet. Start one above!
+                            <div className="text-xs text-gray-500 p-4 text-center">
+                                No chats yet, Start new one above!
                             </div>
                         ) : (
-                            filteredActive.map((session, i) => <SessionCard key={session.id} session={session} isLast={i >= filteredActive.length - 2} />)
+                            filteredActive.map((session, i) => <SessionCard key={session.id} session={session} isLast={filteredActive.length > 2 && i >= filteredActive.length - 2} />)
                         )}
                     </div>
 
@@ -335,7 +329,7 @@ const ChatHistory = ({ isOpen, setOpen }) => {
                             {showArchived && (
                                 <div className="space-y-1.5">
                                     {filteredArchived.map((session, i) => (
-                                        <SessionCard key={session.id} session={session} isArchived isLast={i >= filteredArchived.length - 2} />
+                                        <SessionCard key={session.id} session={session} isArchived isLast={true} />
                                     ))}
                                 </div>
                             )}
