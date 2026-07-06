@@ -7,6 +7,7 @@ export const useChat = () => {
         messages, addMessage, updateLastMessage, isTyping, setIsTyping, apiKey, authToken,
         sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession,
         isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages,
+        masked, materializeGhost, pendingSessionRef,
         archivedIds, archiveSession, unarchiveSession
     } = useContext(ChatContext);
 
@@ -43,6 +44,7 @@ export const useChat = () => {
         messages, isTyping, sendMessage,
         sessions, activeSessionId, createNewSession, switchSession, deleteSession, clearAllSessions, renameSession,
         isPrivateMode, setIsPrivateMode, isDeepResearch, setIsDeepResearch, setPrivateMessages,
+        masked, materializeGhost, pendingSessionRef,
         archivedIds, archiveSession, unarchiveSession
     };
 };

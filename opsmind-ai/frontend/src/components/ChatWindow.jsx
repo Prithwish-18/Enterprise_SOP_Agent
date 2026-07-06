@@ -46,14 +46,22 @@ const ChatWindow = ({ onUploadSuccess, documents = [], authToken, activeSessionI
             setIsUploading(true);
             try {
                 let targetSessionId = isPrivateMode ? 'private' : activeSessionId;
+
+                // Materialize the ghost session BEFORE uploading so the document is stored
+                // under the real session ID — not under a temporary "ghost-xxx" ID.
                 if (!isPrivateMode && pendingSessionRef?.current && pendingSessionRef.current === activeSessionId) {
                     const realId = await materializeGhost();
                     if (realId) targetSessionId = realId;
                 }
+
                 await uploadSOP([file], authToken, targetSessionId);
-                if (onUploadSuccess) onUploadSuccess();
+
+                // Small delay lets React flush the activeSessionId state update that
+                // materializeGhost triggered before ChatPage's fetchDocs runs.
+                if (onUploadSuccess) setTimeout(() => onUploadSuccess(), 80);
             } catch (error) {
-                console.error("Upload failed", error);
+                console.error('Upload failed', error);
+                alert('Upload failed: ' + (error.message || 'Unknown error'));
             } finally {
                 setIsUploading(false);
                 if (fileInputRef.current) fileInputRef.current.value = '';
@@ -143,10 +151,10 @@ const ChatWindow = ({ onUploadSuccess, documents = [], authToken, activeSessionI
                             ref={chatInputRef}
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder={noDocs ? "Please upload a SOP document first..." : isPrivateMode ? "Ask a private question..." : "Ask about your SOPs . . ."}
+                            placeholder={noDocs ? "Please upload a SOP document first . . ." : isPrivateMode ? "Ask a private question . . ." : "Ask about your SOPs . . ."}
                             className={`flex-1 bg-transparent py-2.5 px-2 focus:outline-none text-sm sm:text-base min-w-0 ${noDocs ? 'text-gray-500 placeholder-gray-600 cursor-not-allowed' : 'text-gray-100 placeholder-gray-500'}`}
                             disabled={isTyping || noDocs}
-                            autoComplete="off"
+                            autoComplete="one-time-code"
                             autoCorrect="off"
                             autoCapitalize="sentences"
                             spellCheck="true"

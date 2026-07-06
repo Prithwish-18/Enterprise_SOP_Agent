@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useRef } from 'react';
+import React, { useEffect, useState, useContext, useRef, useCallback } from 'react';
 import ChatWindow from '../components/ChatWindow';
 import { getDocuments, deleteDocument } from '../services/api';
 import { FileText, Trash2, Loader2, Clock, Upload, X, PanelLeftClose, PanelLeft, History } from 'lucide-react';
@@ -13,6 +13,11 @@ const StatusDot = ({ status }) => {
 
 const ChatPage = () => {
     const { authToken, activeSessionId } = useContext(ChatContext);
+    // Keep a ref so fetchDocs always reads the latest session ID,
+    // even when called from a stale closure (e.g. inside setTimeout).
+    const activeSessionIdRef = useRef(activeSessionId);
+    useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deletingId, setDeletingId] = useState(null);
@@ -24,7 +29,10 @@ const ChatPage = () => {
         if (!silent) setLoading(true);
         try {
             const data = await getDocuments(authToken);
-            const sessionDocs = data.filter(d => d.sessionId === activeSessionId);
+            // Use the ref value so we always filter against the latest session ID,
+            // not the stale closure value (critical after ghost materialisation).
+            const currentSessionId = activeSessionIdRef.current;
+            const sessionDocs = data.filter(d => d.sessionId === currentSessionId);
             setDocuments(sessionDocs);
         } catch (err) {
             console.error('Failed to fetch documents', err);
@@ -36,11 +44,21 @@ const ChatPage = () => {
     useEffect(() => {
         if (activeSessionId && !activeSessionId.startsWith('ghost-')) {
             fetchDocs();
-        } else {
+        } else if (!activeSessionId || activeSessionId.startsWith('ghost-')) {
+            // Ghost / no session — clear docs immediately so UI shows empty state.
             setDocuments([]);
             setLoading(false);
         }
     }, [activeSessionId]);
+
+    // Stable callback passed to ChatWindow as onUploadSuccess.
+    // We wait a tick so that any React state updates (e.g. activeSessionId after
+    // ghost materialisation) have been flushed before fetchDocs reads the ref.
+    const handleUploadSuccess = useCallback(() => {
+        // ChatWindow already adds its own 80 ms delay before calling this,
+        // but we add another tick here as a safety net.
+        setTimeout(() => fetchDocs(true), 50);
+    }, [authToken]);
 
     // Poll while any doc is processing
     useEffect(() => {
@@ -176,7 +194,7 @@ const ChatPage = () => {
                 </div>
 
                 {/* Chat window */}
-                <ChatWindow onUploadSuccess={fetchDocs}
+                <ChatWindow onUploadSuccess={handleUploadSuccess}
                     documents={documents}
                     authToken={authToken}
                     activeSessionId={activeSessionId}/>

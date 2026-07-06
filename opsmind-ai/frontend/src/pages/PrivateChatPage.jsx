@@ -54,18 +54,19 @@ const PrivateChatPage = () => {
     }, [authToken, documents]);
 
     const handleFileUpload = async (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setIsUploading(true);
-            try {
-                await uploadSOP([file], authToken, 'private');
-                fetchDocs(true);
-            } catch (error) {
-                console.error("Upload failed", error);
-            } finally {
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            }
+        const selectedFiles = e.target.files;
+        if (!selectedFiles || selectedFiles.length === 0) return;
+        const fileArr = Array.from(selectedFiles);
+        setIsUploading(true);
+        try {
+            await uploadSOP(fileArr, authToken, 'private');
+            fetchDocs(true);
+        } catch (error) {
+            console.error('Upload failed', error);
+            alert('Upload failed: ' + (error.message || 'Unknown error'));
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -147,11 +148,12 @@ const PrivateChatPage = () => {
                         </div>
                     ) : documents.length === 0 ? (
                         <div className="flex flex-col items-center gap-3 py-10 text-center">
-                            <input type="file"
+                    <input type="file"
                                 ref={fileInputRef}
                                 onChange={handleFileUpload}
                                 className="hidden"
-                                accept=".pdf,.doc,.docx,.txt"/>
+                                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                                multiple />
                             <button onClick={() => fileInputRef.current?.click()}
                                 disabled={isUploading}
                                 className={`group flex flex-col items-center justify-center py-15 w-full rounded-2xl border border-dashed transition-all cursor-pointer ${isUploading ? 'opacity-50 cursor-not-allowed border-purple-500/20 bg-purple-500/5' : 'border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 hover:border-purple-500/50'}`}>
@@ -189,6 +191,20 @@ const PrivateChatPage = () => {
                             </div>
                         ))
                     )}
+                </div>
+
+                {/* Persistent upload button — always visible so users can add more docs */}
+                <div className="px-3 pb-3 shrink-0">
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
+                        style={{ background: 'rgba(168,85,247,0.1)', border: '1px dashed rgba(168,85,247,0.3)', color: '#c084fc' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.2)'; e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; e.currentTarget.style.borderColor = 'rgba(168,85,247,0.3)'; }}>
+                        {isUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                        {isUploading ? 'Uploading...' : 'Add Document'}
+                    </button>
                 </div>
             </aside>
 

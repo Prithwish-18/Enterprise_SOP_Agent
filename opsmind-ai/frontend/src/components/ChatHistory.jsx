@@ -272,6 +272,10 @@ const ChatHistory = ({ isOpen, setOpen }) => {
                             placeholder="Search chats . . ."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
+                            name="sidebar-chat-search"
+                            autoComplete="one-time-code"
+                            autoCorrect="off"
+                            autoCapitalize="off"
                             className="w-full bg-black/30 border border-white/10 rounded-lg py-2 pl-9 pr-8 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all"/>
                         {searchQuery && (
                             <button onClick={() => setSearchQuery('')}

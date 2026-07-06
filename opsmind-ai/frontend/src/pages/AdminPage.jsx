@@ -115,8 +115,9 @@ const AdminPage = () => {
                     <p className="text-gray-400 mt-1 text-sm sm:text-base">Upload and manage SOPs that power OpsMind's knowledge base</p>
                 </div>
 
-                {/* Upload Panel */}
-                <UploadPanel onUploadSuccess={fetchDocs} authToken={authToken} sessionId={activeSessionId} />
+                {/* Upload Panel — never pass a ghost session ID to the backend */}
+                <UploadPanel onUploadSuccess={fetchDocs} authToken={authToken}
+                    sessionId={activeSessionId?.startsWith('ghost-') ? null : activeSessionId} />
 
                 {/* Documents List */}
                 <div className="glass rounded-2xl overflow-hidden">
